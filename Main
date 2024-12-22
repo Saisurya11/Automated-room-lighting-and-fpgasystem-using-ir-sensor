@@ -1,0 +1,226 @@
+`timescale 1ns / 1ps
+
+module hall(
+input clk,
+input rst,
+input en,
+input ex,
+output reg [5:0] person,
+output reg [4:0] light
+);
+
+// Synchronization registers
+reg entry_sync1 = 0, entry_sync2 = 0;
+reg exit_sync1 = 0, exit_sync2 = 0;
+
+wire en_posedge, ex_posedge;
+
+// Synchronize entry and exit signals
+always @(posedge clk) begin
+if (rst) begin
+entry_sync1 <= 0;
+entry_sync2 <= 0;
+exit_sync1 <= 0;
+exit_sync2 <= 0;
+end else begin
+entry_sync1 <= en;
+entry_sync2 <= entry_sync1;
+exit_sync1 <= ex;
+exit_sync2 <= exit_sync1;
+end
+end
+
+// Detect rising edges of en and ex signals
+assign en_posedge = entry_sync1 && ~entry_sync2;
+assign ex_posedge = exit_sync1 && ~exit_sync2;
+
+// Main logic for person count and lights
+always @(posedge clk) begin
+if (rst) begin
+person <= 0;
+light <= 0;
+end else begin
+// Update person count
+if (en_posedge && (person < 6'd30)) begin
+person <= person + 1;
+end else if (ex_posedge && (person > 6'd0)) begin
+person <= person - 1;
+end
+
+// Update lights based on person count
+case (person)
+6'd0, 6'd1, 6'd2, 6'd3, 6'd4, 6'd5: light <= 5'b00001;
+6'd6, 6'd7, 6'd8, 6'd9, 6'd10, 6'd11: light <= 5'b00011;
+6'd12, 6'd13, 6'd14, 6'd15, 6'd16, 6'd17: light <= 5'b00111;
+6'd18, 6'd19, 6'd20, 6'd21, 6'd22, 6'd23: light <= 5'b01111;
+6'd24, 6'd25, 6'd26, 6'd27, 6'd28, 6'd29: light <= 5'b11111;
+default: light <= 5'b00000; // Default case for safety
+endcase
+end
+end
+endmodule
+
+
+
+
+//module hall_tb;
+//    reg clk = 0;
+//    reg rst;
+//    reg en;
+//    reg ex;
+//    wire [5:0] person;
+//    wire [4:0] light;
+
+//    // Instantiate the hall module
+//    hall uut (
+//        .clk(clk),
+//        .rst(rst),
+//        .en(en),
+//        .ex(ex),
+//        .person(person),
+//        .light(light)
+//    );
+
+//    // Clock generation
+//    always #5 clk = ~clk; // Generate a clock with a period of 10 time units
+
+//    initial begin
+//        // Initialize signals
+//        rst = 1;
+//        en = 0;
+//        ex = 0;
+
+//        // Apply reset
+//        #10 rst = 0;
+
+//        // Simulate entry pulses
+//        #10 en = 1; #10 en = 0; // Person 1 enters
+//        #10 en = 1; #10 en = 0; // Person 2 enters
+//        #10 en = 1; #10 en = 0; // Person 3 enters
+//        #10 en = 1; #10 en = 0; // Person 4 enters
+//        #10 en = 1; #10 en = 0; // Person 5 enters
+//        #10 en = 1; #10 en = 0; // Person 6 enters
+//        #10 en = 1; #10 en = 0; // Person 1 enters
+//        #10 en = 1; #10 en = 0; // Person 2 enters
+//        #10 en = 1; #10 en = 0; // Person 3 enters
+//        #10 en = 1; #10 en = 0; // Person 4 enters
+//        #10 en = 1; #10 en = 0; // Person 5 enters
+//        #10 en = 1; #10 en = 0; // Person 6 enters        #10 en = 1; #10 en = 0; // Person 1 enters
+//        #10 en = 1; #10 en = 0; // Person 2 enters
+//        #10 en = 1; #10 en = 0; // Person 3 enters
+//        #10 en = 1; #10 en = 0; // Person 4 enters
+//        #10 en = 1; #10 en = 0; // Person 5 enters
+//        #10 en = 1; #10 en = 0; // Person 6 enters
+//        // Simulate exit pulses
+//        #10 ex = 1; #10 ex = 0; // Person 6 exits
+//        #10 ex = 1; #10 ex = 0; // Person 5 exits
+
+//        // Simulate overflow (more than 30 persons)
+//        repeat (5) begin
+//            #10 en = 1; #10 en = 0; // Adding additional persons
+//        end
+
+//        // Test reset functionality
+//        #10 rst = 1; #10 rst = 0; // Reset the system
+
+//        // Additional testing: simultaneous en and ex (should have no effect)
+//        #10 en = 1; ex = 1; #10 en = 0; ex = 0;
+
+//        // Stop simulation
+//        #100 $stop;
+//    end
+//endmodule
+
+
+//hall_lighting_system(
+//    input clk, 
+//    input rst, 
+//    input entry, 
+//    input exit, 
+//    output reg [7:0] lights = 8'b00000000, 
+//    output reg [3:0] person_count = 4'b0000
+//);
+//hall_lighting_system(clk,rst,entry,exit,person,light)
+
+module clock_divider(clk,ir_clk,seg_clk);
+input clk;
+output reg ir_clk,seg_clk;
+reg [31:0]counter=0;
+always@(posedge clk)
+begin
+counter<=counter+1;
+ir_clk<=counter[21];
+seg_clk<=counter[16];
+end
+endmodule
+
+module refresh_counter(clk,count);
+input clk;
+output reg [1:0]count=0;
+always@(posedge clk)
+begin
+count=count+1;
+end
+endmodule
+module display(clk,rst,en,ex,seg,an,light);
+input clk,rst,en,ex;
+output reg [7:0]an=8'b11111111;
+output reg [6:0]seg=7'b1111111;
+output [4:0]light;
+wire ir_clk,seg_clk;
+clock_divider(clk,ir_clk,seg_clk);
+wire [1:0]count;
+refresh_counter(seg_clk,count);
+wire [5:0]person;
+hall m1(ir_clk,rst,en,ex,person,light);
+reg [3:0]bcd;
+always@(person,ex,en,count)
+begin
+case(count)
+0:begin
+bcd<=person%10;
+an=8'b11111110;
+end
+1:begin
+bcd<=person/10;
+an=8'b11111101;
+end
+2:begin
+bcd<=0;
+an=8'b11111011;
+end
+3:begin
+bcd<=0;
+an=8'b11110111;
+end
+
+default:begin
+bcd<=0;
+an=8'b11110111;
+end
+endcase
+
+case(bcd)
+0:seg=7'b1000000;
+1:seg=7'b1111001;
+2:seg=7'b0100100;
+3:seg=7'b0110000;
+4:seg=7'b0011001;
+5:seg=7'b0010010;
+6:seg=7'b0000010;
+7:seg=7'b1111000;
+8:seg=7'b0000000;
+9:seg=7'b0010000;
+default:seg=7'b0111111;
+endcase
+end
+endmodule
+
+module top(clk,sw,seg,JA,an,led);
+input clk,sw;
+input [1:0]JA;
+output [6:0]seg;
+output [7:0]an;
+output [4:0]led;
+display d1(clk,sw,JA[0],JA[1],seg,an,led);
+endmodule
